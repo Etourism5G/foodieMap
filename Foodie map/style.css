@@ -1,0 +1,21 @@
+/* Làm font chữ gọn gàng */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #fafafa;
+}
+
+/* Tiêu đề chính */
+h1 {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+/* Danh sách quán ăn */
+#food-list .list-group-item {
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+#food-list .list-group-item:hover {
+  background: #ffe0b2;
+}
