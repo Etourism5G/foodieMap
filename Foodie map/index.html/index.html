@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foodie Map</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    #map { height: 500px; border-radius: 10px; margin-bottom: 20px; }
+  </style>
+</head>
+<body class="container">
+  <h1 class="text-center mt-3">🍜 Foodie Map</h1>
+
+  <!-- Khung bản đồ -->
+  <div id="map"></div>
+
+  <!-- Form thêm quán ăn -->
+  <h2 class="mt-4">➕ Thêm quán ăn mới</h2>
+  <div class="mb-3">
+    <label class="form-label">Tên quán ăn:</label>
+    <input type="text" id="placeName" class="form-control" placeholder="Nhập tên quán">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Tọa độ (latitude, longitude):</label>
+    <input type="text" id="placeCoords" class="form-control" placeholder="(Có thể bỏ trống nếu click bản đồ)">
+  </div>
+  <button class="btn btn-success mb-4" onclick="addPlace()">Thêm vào bản đồ & vòng quay</button>
+
+  <!-- Danh sách quán -->
+  <h2 class="mt-4">📋 Danh sách quán ăn</h2>
+  <ul id="placeList" class="list-group mb-4"></ul>
+
+  <!-- Vòng quay -->
+  <h2 class="text-center mt-4">🎡 Vòng quay chọn món</h2>
+  <div class="d-flex justify-content-center">
+    <canvas id="wheel" width="400" height="400"></canvas>
+  </div>
+  <div class="text-center mt-3">
+    <button class="btn btn-primary" onclick="spinWheel()">Quay Ngay</button>
+  </div>
+  <p class="text-center mt-3" id="result"></p>
+
+  <script>
+    // ================== MAP ==================
+    var map = L.map('map').setView([21.0285, 105.8542], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Danh sách quán ban đầu
+    var foodPlaces = [
+      { name: "Phở Bát Đàn", coords: [21.035, 105.85] },
+      { name: "Bún Chả Hàng Mành", coords: [21.033, 105.847] },
+      { name: "Cơm Tấm Sài Gòn", coords: [21.03, 105.86] },
+      { name: "Phở Thìn Lò Đúc", coords: [21.015851, 105.860729] },
+      { name: "Xôi Yến Nguyễn Hữu Huân", coords: [21.033512, 105.853268] },
+      { name: "Chè Bốn Mùa Hàng Cân", coords: [21.034923, 105.850367] },
+      { name: "Cà phê Giảng (Egg Coffee)", coords: [21.033994, 105.849894] },
+      { name: "Bánh Mì 25 Hàng Cá", coords: [21.036381, 105.847680] },
+      { name: "Bún Thang Cầu Gỗ", coords: [21.033228, 105.852267] },
+      { name: "Kem Tràng Tiền", coords: [21.024884, 105.856511] }
+    ];
+
+    // Vẽ marker ban đầu
+    foodPlaces.forEach(p => {
+      L.marker(p.coords).addTo(map).bindPopup(`<b>${p.name}</b>`);
+    });
+
+    // ================== VÒNG QUAY ==================
+    const dishes = foodPlaces.map(p => p.name);
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const radius = canvas.width / 2;
+    let currentAngle = 0;
+
+    function drawWheel() {
+      const sliceAngle = (2 * Math.PI) / dishes.length;
+      for (let i = 0; i < dishes.length; i++) {
+        ctx.beginPath();
+        ctx.moveTo(radius, radius);
+        ctx.arc(radius, radius, radius, i * sliceAngle, (i + 1) * sliceAngle);
+        ctx.fillStyle = i % 2 === 0 ? "#f8b400" : "#ff6363";
+        ctx.fill();
+        ctx.save();
+
+        ctx.translate(radius, radius);
+        ctx.rotate(i * sliceAngle + sliceAngle / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#fff";
+        ctx.font = "16px Arial";
+        ctx.fillText(dishes[i], radius - 10, 5);
+        ctx.restore();
+      }
+    }
+
+    function refreshWheel() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawWheel();
+    }
+
+    drawWheel();
+
+    function spinWheel() {
+      const spinAngle = Math.random() * 360 + 720;
+      const spinTime = 3000;
+      const start = Date.now();
+
+      function animate() {
+        const now = Date.now();
+        const elapsed = now - start;
+        if (elapsed < spinTime) {
+          const progress = elapsed / spinTime;
+          currentAngle = (spinAngle * progress * Math.PI) / 180;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.save();
+          ctx.translate(radius, radius);
+          ctx.rotate(currentAngle);
+          ctx.translate(-radius, -radius);
+          drawWheel();
+          ctx.restore();
+          requestAnimationFrame(animate);
+        } else {
+          const finalAngle = (spinAngle * Math.PI) / 180;
+          const sliceAngle = (2 * Math.PI) / dishes.length;
+          const winningIndex = Math.floor(
+            ((2 * Math.PI - (finalAngle % (2 * Math.PI))) / sliceAngle) % dishes.length
+          );
+          const chosen = dishes[winningIndex];
+          document.getElementById("result").innerText = "👉 Hôm nay bạn ăn: " + chosen;
+
+          const place = foodPlaces.find(p => p.name === chosen);
+          if (place) {
+            map.setView(place.coords, 16);
+            L.popup().setLatLng(place.coords).setContent(`<b>${place.name}</b>`).openOn(map);
+          }
+        }
+      }
+      animate();
+    }
+
+    // ================== HÀM THÊM QUÁN ==================
+    let lastClickedCoords = null;
+
+    function addPlace() {
+      const name = document.getElementById("placeName").value.trim();
+      let coordsText = document.getElementById("placeCoords").value.trim();
+
+      if (!name) {
+        alert("⚠️ Vui lòng nhập tên quán!");
+        return;
+      }
+
+      let coords;
+      if (coordsText) {
+        coords = coordsText.split(",").map(c => parseFloat(c));
+        if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+          alert("⚠️ Tọa độ không hợp lệ!");
+          return;
+        }
+      } else if (lastClickedCoords) {
+        coords = lastClickedCoords;
+      } else {
+        alert("⚠️ Vui lòng nhập tọa độ hoặc click bản đồ!");
+        return;
+      }
+
+      const newPlace = { name: name, coords: coords };
+      foodPlaces.push(newPlace);
+      dishes.push(name);
+
+      L.marker(coords).addTo(map).bindPopup(`<b>${name}</b>`);
+
+      refreshWheel();
+      updatePlaceList();
+    }
+
+    // ================== CLICK MAP ==================
+    let tempMarker = null;
+
+    map.on("click", function(e) {
+      const lat = e.latlng.lat.toFixed(6);
+      const lng = e.latlng.lng.toFixed(6);
+      lastClickedCoords = [parseFloat(lat), parseFloat(lng)];
+      document.getElementById("placeCoords").value = lat + ", " + lng;
+
+      if (tempMarker) {
+        map.removeLayer(tempMarker);
+      }
+
+      tempMarker = L.marker([lat, lng]).addTo(map)
+        .bindPopup("📍 Vị trí bạn chọn: " + lat + ", " + lng).openPopup();
+    });
+
+    // ================== DANH SÁCH QUÁN ==================
+    function updatePlaceList() {
+      const list = document.getElementById("placeList");
+      list.innerHTML = "";
+      foodPlaces.forEach((p, index) => {
+        const li = document.createElement("li");
+        li.className = "list-group-item d-flex justify-content-between align-items-center";
+        li.innerHTML = `
+          ${p.name}
+          <button class="btn btn-sm btn-danger">❌</button>
+        `;
+        li.querySelector("button").onclick = () => {
+          foodPlaces.splice(index, 1);
+          dishes.splice(index, 1);
+          refreshWheel();
+          updatePlaceList();
+        };
+        list.appendChild(li);
+      });
+    }
+
+    updatePlaceList();
+  </script>
+</body>
+</html>
